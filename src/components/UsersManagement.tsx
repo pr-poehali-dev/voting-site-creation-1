@@ -16,6 +16,8 @@ interface User {
   email: string;
   role: string;
   isOwner: boolean;
+  banned: boolean;
+  banReason?: string;
   createdAt: string;
 }
 
@@ -59,6 +61,26 @@ export default function UsersManagement({ currentUserEmail }: UsersManagementPro
     }
   };
 
+  const handleBanUser = async (userId: number, action: 'ban' | 'unban') => {
+    const banReason = action === 'ban' ? prompt('Укажите причину бана:', 'Нарушение правил платформы') : undefined;
+    
+    if (action === 'ban' && !banReason) return;
+
+    try {
+      const response = await fetch('https://functions.poehali.dev/cf4b14c6-467d-4cf5-a098-069320f9d42c', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, action, ban_reason: banReason })
+      });
+
+      if (response.ok) {
+        await loadUsers();
+      }
+    } catch (error) {
+      console.error('Ban/Unban error:', error);
+    }
+  };
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin':
@@ -98,7 +120,7 @@ export default function UsersManagement({ currentUserEmail }: UsersManagementPro
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Всего пользователей</CardDescription>
@@ -141,6 +163,21 @@ export default function UsersManagement({ currentUserEmail }: UsersManagementPro
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardDescription>Заблокировано</CardDescription>
+            <CardTitle className="text-3xl">
+              {users.filter(u => u.banned).length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Icon name="Ban" size={14} />
+              <span>Забаненные</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -168,12 +205,21 @@ export default function UsersManagement({ currentUserEmail }: UsersManagementPro
                           Владелец
                         </Badge>
                       )}
+                      {user.banned && (
+                        <Badge variant="destructive" className="gap-1">
+                          <Icon name="Ban" size={12} />
+                          Заблокирован
+                        </Badge>
+                      )}
                       {user.email === currentUserEmail && (
                         <Badge variant="outline">Вы</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Зарегистрирован: {new Date(user.createdAt).toLocaleDateString('ru-RU')}
+                      {user.banned && user.banReason && (
+                        <span className="ml-2 text-destructive">• Причина: {user.banReason}</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -185,34 +231,59 @@ export default function UsersManagement({ currentUserEmail }: UsersManagementPro
                   </Badge>
 
                   {!user.isOwner && (
-                    <Select
-                      value={user.role}
-                      onValueChange={(value) => handleRoleChange(user.id, value)}
-                    >
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Выберите роль" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user">
-                          <div className="flex items-center gap-2">
-                            <Icon name="User" size={14} />
-                            Пользователь
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="moderator">
-                          <div className="flex items-center gap-2">
-                            <Icon name="ShieldCheck" size={14} />
-                            Модератор
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="admin">
-                          <div className="flex items-center gap-2">
-                            <Icon name="Shield" size={14} />
-                            Администратор
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <>
+                      <Select
+                        value={user.role}
+                        onValueChange={(value) => handleRoleChange(user.id, value)}
+                        disabled={user.banned}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Выберите роль" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">
+                            <div className="flex items-center gap-2">
+                              <Icon name="User" size={14} />
+                              Пользователь
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="moderator">
+                            <div className="flex items-center gap-2">
+                              <Icon name="ShieldCheck" size={14} />
+                              Модератор
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="admin">
+                            <div className="flex items-center gap-2">
+                              <Icon name="Shield" size={14} />
+                              Администратор
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {user.banned ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleBanUser(user.id, 'unban')}
+                          className="gap-2"
+                        >
+                          <Icon name="CheckCircle" size={14} />
+                          Разблокировать
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleBanUser(user.id, 'ban')}
+                          className="gap-2"
+                        >
+                          <Icon name="Ban" size={14} />
+                          Заблокировать
+                        </Button>
+                      )}
+                    </>
                   )}
                   {user.isOwner && (
                     <div className="w-[180px] text-center text-sm text-muted-foreground">

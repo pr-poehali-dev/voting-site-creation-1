@@ -23,6 +23,22 @@
         "role": "string"
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Забанить пользователя",
+      "method": "POST",
+      "body": {
+        "user_id": 1,
+        "action": "ban",
+        "ban_reason": "Тестовый бан"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "id": "number",
+        "email": "string",
+        "banned": "boolean"
+      },
+      "bodyMatcher": "partial"
     }
   ]
 }

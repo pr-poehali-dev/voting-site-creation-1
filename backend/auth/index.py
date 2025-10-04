@@ -49,18 +49,35 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         cursor.execute(
-            "SELECT id, email, is_owner, created_at FROM t_p25393184_voting_site_creation.users WHERE email = %s",
+            "SELECT id, email, is_owner, banned, ban_reason, created_at FROM t_p25393184_voting_site_creation.users WHERE email = %s",
             (email,)
         )
         user = cursor.fetchone()
         
         if not user:
             cursor.execute(
-                "INSERT INTO t_p25393184_voting_site_creation.users (email, is_owner) VALUES (%s, FALSE) RETURNING id, email, is_owner, created_at",
+                "INSERT INTO t_p25393184_voting_site_creation.users (email, is_owner, banned) VALUES (%s, FALSE, FALSE) RETURNING id, email, is_owner, banned, ban_reason, created_at",
                 (email,)
             )
             user = cursor.fetchone()
             conn.commit()
+        
+        if user.get('banned', False):
+            cursor.close()
+            conn.close()
+            return {
+                'statusCode': 403,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'error': 'Ваш аккаунт заблокирован',
+                    'banned': True,
+                    'banReason': user.get('ban_reason', 'Нарушение правил')
+                }),
+                'isBase64Encoded': False
+            }
         
         cursor.close()
         conn.close()
@@ -75,6 +92,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'id': user['id'],
                 'email': user['email'],
                 'isOwner': user.get('is_owner', False),
+                'banned': user.get('banned', False),
                 'createdAt': user['created_at'].isoformat() if user.get('created_at') else None
             }, default=str),
             'isBase64Encoded': False

@@ -1,5 +1,5 @@
 '''
-Business: Управление пользователями и их ролями
+Business: Управление пользователями, их ролями и банами
 Args: event - dict с httpMethod, body, queryStringParameters
       context - object с attributes: request_id, function_name
 Returns: HTTP response dict со списком пользователей или результатом обновления
@@ -19,7 +19,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Email',
                 'Access-Control-Max-Age': '86400'
             },
@@ -33,7 +33,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     if method == 'GET':
         cursor.execute(
-            "SELECT id, email, role, is_owner, created_at FROM t_p25393184_voting_site_creation.users ORDER BY created_at DESC"
+            "SELECT id, email, role, is_owner, banned, ban_reason, created_at FROM t_p25393184_voting_site_creation.users ORDER BY created_at DESC"
         )
         users = cursor.fetchall()
         
@@ -47,6 +47,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'email': user['email'],
                 'role': user.get('role', 'user'),
                 'isOwner': user.get('is_owner', False),
+                'banned': user.get('banned', False),
+                'banReason': user.get('ban_reason'),
                 'createdAt': user['created_at'].isoformat() if user.get('created_at') else None
             })
         
@@ -109,6 +111,79 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'id': updated_user['id'],
                 'email': updated_user['email'],
                 'role': updated_user['role']
+            }),
+            'isBase64Encoded': False
+        }
+    
+    if method == 'POST':
+        body_data = json.loads(event.get('body', '{}'))
+        user_id = body_data.get('user_id')
+        ban_reason = body_data.get('ban_reason', 'Нарушение правил')
+        action = body_data.get('action')
+        
+        if not user_id or not action:
+            cursor.close()
+            conn.close()
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': 'user_id и action обязательны'}),
+                'isBase64Encoded': False
+            }
+        
+        if action == 'ban':
+            cursor.execute(
+                "UPDATE t_p25393184_voting_site_creation.users SET banned = TRUE, ban_reason = %s WHERE id = %s AND is_owner = FALSE RETURNING id, email, banned",
+                (ban_reason, user_id)
+            )
+        elif action == 'unban':
+            cursor.execute(
+                "UPDATE t_p25393184_voting_site_creation.users SET banned = FALSE, ban_reason = NULL WHERE id = %s RETURNING id, email, banned",
+                (user_id,)
+            )
+        else:
+            cursor.close()
+            conn.close()
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': 'action должен быть ban или unban'}),
+                'isBase64Encoded': False
+            }
+        
+        updated_user = cursor.fetchone()
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        
+        if not updated_user:
+            return {
+                'statusCode': 404,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': 'Пользователь не найден или это владелец'}),
+                'isBase64Encoded': False
+            }
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'id': updated_user['id'],
+                'email': updated_user['email'],
+                'banned': updated_user['banned']
             }),
             'isBase64Encoded': False
         }
