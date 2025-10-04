@@ -17,7 +17,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
@@ -34,6 +34,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                    po.id, po.option_text, po.votes
             FROM polls p
             LEFT JOIN poll_options po ON p.id = po.poll_id
+            WHERE p.status != 'deleted'
             ORDER BY p.created_at DESC, po.id
         """)
         rows = cur.fetchall()
@@ -133,6 +134,41 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({'message': 'Vote recorded'})
+        }
+    
+    if method == 'PATCH':
+        body_data = json.loads(event.get('body', '{}'))
+        poll_id = body_data.get('poll_id')
+        new_status = body_data.get('status')
+        
+        cur.execute(
+            "UPDATE polls SET status = %s WHERE id = %s",
+            (new_status, poll_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'message': 'Status updated'})
+        }
+    
+    if method == 'DELETE':
+        body_data = json.loads(event.get('body', '{}'))
+        poll_id = body_data.get('poll_id')
+        
+        cur.execute("UPDATE polls SET status = %s WHERE id = %s", ('deleted', poll_id))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'message': 'Poll deleted'})
         }
     
     cur.close()

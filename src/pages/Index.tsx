@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,81 +28,130 @@ export default function Index() {
   const [newPollTitle, setNewPollTitle] = useState('');
   const [newPollDescription, setNewPollDescription] = useState('');
   const [newPollOptions, setNewPollOptions] = useState(['', '']);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [votedPolls, setVotedPolls] = useState<Set<string>>(new Set());
 
   const OWNER_EMAIL = 'snovi6423@gmail.com';
   const isOwner = userEmail === OWNER_EMAIL;
 
-  const [polls, setPolls] = useState<Poll[]>([
-    {
-      id: '1',
-      title: 'Выбор направления развития платформы',
-      description: 'Какую функцию стоит добавить в первую очередь?',
-      options: [
-        { id: '1', text: 'Аналитика и отчёты', votes: 42 },
-        { id: '2', text: 'Мобильное приложение', votes: 38 },
-        { id: '3', text: 'API для интеграции', votes: 15 },
-        { id: '4', text: 'Расширенная безопасность', votes: 28 }
-      ],
-      totalVotes: 123,
-      status: 'active',
-      endDate: '2025-10-15'
-    },
-    {
-      id: '2',
-      title: 'Оценка работы команды за квартал',
-      description: 'Как вы оцениваете эффективность работы команды?',
-      options: [
-        { id: '1', text: 'Отлично', votes: 67 },
-        { id: '2', text: 'Хорошо', votes: 45 },
-        { id: '3', text: 'Удовлетворительно', votes: 12 },
-        { id: '4', text: 'Требует улучшения', votes: 5 }
-      ],
-      totalVotes: 129,
-      status: 'completed',
-      endDate: '2025-09-30'
-    }
-  ]);
+  const [polls, setPolls] = useState<Poll[]>([]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      setIsAuthenticated(true);
-      setUserEmail(email);
+      try {
+        const response = await fetch('https://functions.poehali.dev/6483391f-16e3-4131-b805-2b0113ea7a06', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        setUserId(data.user_id);
+        setIsAuthenticated(true);
+        setUserEmail(email);
+      } catch (error) {
+        console.error('Login error:', error);
+      }
     }
   };
 
-  const handleVote = (pollId: string, optionId: string) => {
-    setPolls(polls.map(poll => {
-      if (poll.id === pollId) {
-        return {
-          ...poll,
-          options: poll.options.map(opt => 
-            opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt
-          ),
-          totalVotes: poll.totalVotes + 1
-        };
-      }
-      return poll;
-    }));
+  const loadPolls = async () => {
+    try {
+      const response = await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad');
+      const data = await response.json();
+      setPolls(data.polls || []);
+    } catch (error) {
+      console.error('Load polls error:', error);
+    }
   };
 
-  const handleCreatePoll = () => {
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadPolls();
+    }
+  }, [isAuthenticated]);
+
+  const handleVote = async (pollId: string, optionId: string) => {
+    if (!userId || votedPolls.has(pollId)) return;
+    
+    try {
+      const response = await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, poll_id: pollId, option_id: optionId })
+      });
+      
+      if (response.ok) {
+        setVotedPolls(prev => new Set(prev).add(pollId));
+        await loadPolls();
+      } else {
+        const error = await response.json();
+        if (error.error === 'Already voted') {
+          setVotedPolls(prev => new Set(prev).add(pollId));
+        }
+      }
+    } catch (error) {
+      console.error('Vote error:', error);
+    }
+  };
+
+  const handleCreatePoll = async () => {
+    if (!userId || !isOwner) return;
     if (newPollTitle && newPollOptions.filter(opt => opt.trim()).length >= 2) {
-      const newPoll: Poll = {
-        id: Date.now().toString(),
-        title: newPollTitle,
-        description: newPollDescription,
-        options: newPollOptions
-          .filter(opt => opt.trim())
-          .map((text, idx) => ({ id: String(idx + 1), text, votes: 0 })),
-        totalVotes: 0,
-        status: 'active',
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      };
-      setPolls([newPoll, ...polls]);
-      setNewPollTitle('');
-      setNewPollDescription('');
-      setNewPollOptions(['', '']);
+      try {
+        const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: newPollTitle,
+            description: newPollDescription,
+            options: newPollOptions.filter(opt => opt.trim()),
+            user_id: userId,
+            end_date: endDate
+          })
+        });
+        
+        setNewPollTitle('');
+        setNewPollDescription('');
+        setNewPollOptions(['', '']);
+        setIsDialogOpen(false);
+        await loadPolls();
+      } catch (error) {
+        console.error('Create poll error:', error);
+      }
+    }
+  };
+
+  const handleDeletePoll = async (pollId: string) => {
+    if (!isOwner) return;
+    if (confirm('Вы уверены, что хотите удалить это голосование?')) {
+      try {
+        await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ poll_id: pollId })
+        });
+        await loadPolls();
+      } catch (error) {
+        console.error('Delete poll error:', error);
+      }
+    }
+  };
+
+  const handleTogglePollStatus = async (pollId: string, currentStatus: string) => {
+    if (!isOwner) return;
+    const newStatus = currentStatus === 'active' ? 'completed' : 'active';
+    try {
+      await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poll_id: pollId, status: newStatus })
+      });
+      await loadPolls();
+    } catch (error) {
+      console.error('Toggle status error:', error);
     }
   };
 
@@ -114,7 +163,7 @@ export default function Index() {
             <div className="mx-auto w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-4">
               <Icon name="Vote" className="text-primary-foreground" size={32} />
             </div>
-            <CardTitle className="text-3xl font-bold">ГОЛОСОВАНИЕ.ру</CardTitle>
+            <CardTitle className="text-3xl font-bold">VOTING PLATFORM</CardTitle>
             <CardDescription className="text-base">
               Платформа для серьёзных голосований
             </CardDescription>
@@ -202,7 +251,7 @@ export default function Index() {
                 <p className="text-muted-foreground mt-1">Примите участие в текущих опросах</p>
               </div>
               {isOwner && (
-                <Dialog>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="gap-2">
                       <Icon name="Plus" size={16} />
@@ -276,7 +325,29 @@ export default function Index() {
                         <CardTitle className="text-xl">{poll.title}</CardTitle>
                         <CardDescription className="mt-2">{poll.description}</CardDescription>
                       </div>
-                      <Badge className="ml-2">Активно</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className="ml-2">Активно</Badge>
+                        {isOwner && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleTogglePollStatus(poll.id, poll.status)}
+                              title="Завершить голосование"
+                            >
+                              <Icon name="CheckCircle" size={16} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePoll(poll.id)}
+                              title="Удалить голосование"
+                            >
+                              <Icon name="Trash2" size={16} />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
                       <span className="flex items-center gap-1">
@@ -296,6 +367,7 @@ export default function Index() {
                         variant="outline"
                         className="w-full justify-start h-auto py-3 px-4 hover:bg-primary hover:text-primary-foreground transition-colors"
                         onClick={() => handleVote(poll.id, option.id)}
+                        disabled={votedPolls.has(poll.id) || poll.status === 'completed'}
                       >
                         <div className="w-full text-left">
                           <div className="flex items-center justify-between mb-2">
