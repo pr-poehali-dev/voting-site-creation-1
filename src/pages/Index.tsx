@@ -163,7 +163,7 @@ export default function Index() {
             <div className="mx-auto w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-4">
               <Icon name="Vote" className="text-primary-foreground" size={32} />
             </div>
-            <CardTitle className="text-3xl font-bold">VOTING PLATFORM</CardTitle>
+            <CardTitle className="text-3xl font-bold">ГОЛОСОВАНИЕ.РУ</CardTitle>
             <CardDescription className="text-base">
               Платформа для серьёзных голосований
             </CardDescription>
@@ -204,7 +204,7 @@ export default function Index() {
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <Icon name="Vote" className="text-primary-foreground" size={20} />
               </div>
-              <h1 className="text-xl font-bold">VOTING PLATFORM</h1>
+              <h1 className="text-xl font-bold">ГОЛОСОВАНИЕ.РУ</h1>
             </div>
             <div className="flex items-center gap-4">
               <Badge variant="outline" className="gap-2">
