@@ -1,14 +1,15 @@
 import json
 import os
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from typing import Dict, Any
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     '''
-    Business: Авторизация пользователя через email
+    Business: Авторизация пользователя через email с проверкой владельца
     Args: event - dict с httpMethod, body, queryStringParameters
           context - object с request_id, function_name
-    Returns: HTTP response dict с user_id и email
+    Returns: HTTP response dict с данными пользователя и статусом владельца
     '''
     method: str = event.get('httpMethod', 'GET')
     
@@ -21,42 +22,67 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Email',
                 'Access-Control-Max-Age': '86400'
             },
-            'body': ''
+            'body': '',
+            'isBase64Encoded': False
         }
     
     if method == 'POST':
         body_data = json.loads(event.get('body', '{}'))
-        email = body_data.get('email')
+        email = body_data.get('email', '').strip().lower()
         
         if not email:
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Email required'})
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': 'Email обязателен'}),
+                'isBase64Encoded': False
             }
         
         database_url = os.environ.get('DATABASE_URL')
         conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        cur.execute(
-            "INSERT INTO users (email) VALUES (%s) ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id, email",
+        cursor.execute(
+            "SELECT id, email, is_owner, created_at FROM t_p25393184_voting_site_creation.users WHERE email = %s",
             (email,)
         )
-        user = cur.fetchone()
-        conn.commit()
+        user = cursor.fetchone()
         
-        cur.close()
+        if not user:
+            cursor.execute(
+                "INSERT INTO t_p25393184_voting_site_creation.users (email, is_owner) VALUES (%s, FALSE) RETURNING id, email, is_owner, created_at",
+                (email,)
+            )
+            user = cursor.fetchone()
+            conn.commit()
+        
+        cursor.close()
         conn.close()
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'user_id': user[0], 'email': user[1]})
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'id': user['id'],
+                'email': user['email'],
+                'isOwner': user.get('is_owner', False),
+                'createdAt': user['created_at'].isoformat() if user.get('created_at') else None
+            }, default=str),
+            'isBase64Encoded': False
         }
     
     return {
         'statusCode': 405,
-        'headers': {'Access-Control-Allow-Origin': '*'},
-        'body': json.dumps({'error': 'Method not allowed'})
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        },
+        'body': json.dumps({'error': 'Метод не поддерживается'}),
+        'isBase64Encoded': False
     }
