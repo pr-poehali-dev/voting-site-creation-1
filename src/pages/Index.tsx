@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -165,6 +166,32 @@ export default function Index() {
     } catch (error) {
       console.error('Toggle status error:', error);
     }
+  };
+
+  const handleExportToExcel = (poll?: Poll) => {
+    const pollsToExport = poll ? [poll] : polls;
+    
+    const data = pollsToExport.flatMap(p => 
+      p.options.map(opt => ({
+        'Голосование': p.title,
+        'Описание': p.description,
+        'Статус': p.status === 'active' ? 'Активно' : 'Завершено',
+        'Дата окончания': new Date(p.endDate).toLocaleDateString('ru-RU'),
+        'Вариант ответа': opt.text,
+        'Количество голосов': opt.votes,
+        'Процент': p.totalVotes > 0 ? `${((opt.votes / p.totalVotes) * 100).toFixed(1)}%` : '0%'
+      }))
+    );
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Результаты');
+    
+    const fileName = poll 
+      ? `${poll.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${new Date().toLocaleDateString('ru-RU')}.xlsx`
+      : `Все_голосования_${new Date().toLocaleDateString('ru-RU')}.xlsx`;
+    
+    XLSX.writeFile(wb, fileName);
   };
 
   if (!isAuthenticated) {
@@ -433,18 +460,41 @@ export default function Index() {
           </TabsContent>
 
           <TabsContent value="results" className="space-y-6">
-            <h2 className="text-2xl font-bold">Результаты голосований</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Результаты голосований</h2>
+              {isOwner && polls.length > 0 && (
+                <Button onClick={() => handleExportToExcel()} className="gap-2">
+                  <Icon name="Download" size={16} />
+                  Экспорт в Excel
+                </Button>
+              )}
+            </div>
             <div className="grid gap-6">
               {polls.map(poll => (
                 <Card key={poll.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>{poll.title}</CardTitle>
-                      <Badge variant={poll.status === 'active' ? 'default' : 'secondary'}>
-                        {poll.status === 'active' ? 'Активно' : 'Завершено'}
-                      </Badge>
+                      <div className="flex-1">
+                        <CardTitle>{poll.title}</CardTitle>
+                        <CardDescription className="mt-2">Всего голосов: {poll.totalVotes}</CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={poll.status === 'active' ? 'default' : 'secondary'}>
+                          {poll.status === 'active' ? 'Активно' : 'Завершено'}
+                        </Badge>
+                        {isOwner && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportToExcel(poll)}
+                            className="gap-1"
+                          >
+                            <Icon name="Download" size={14} />
+                            Excel
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <CardDescription>Всего голосов: {poll.totalVotes}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {poll.options.map(option => {
@@ -603,8 +653,18 @@ export default function Index() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Управление голосованиями</CardTitle>
-                    <CardDescription>Все голосования с возможностью управления</CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Управление голосованиями</CardTitle>
+                        <CardDescription>Все голосования с возможностью управления</CardDescription>
+                      </div>
+                      {polls.length > 0 && (
+                        <Button onClick={() => handleExportToExcel()} variant="outline" className="gap-2">
+                          <Icon name="Download" size={16} />
+                          Экспорт всех
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
