@@ -1,0 +1,23 @@
+{
+  "tests": [
+    {
+      "name": "Get all polls",
+      "method": "GET",
+      "expectedStatus": 200,
+      "bodyMatcher": "skip"
+    },
+    {
+      "name": "Create poll",
+      "method": "POST",
+      "body": {
+        "title": "Test Poll New",
+        "description": "Test Description",
+        "options": ["Option 1", "Option 2"],
+        "user_id": 1,
+        "end_date": "2025-12-31"
+      },
+      "expectedStatus": 201,
+      "bodyMatcher": "skip"
+    }
+  ]
+}

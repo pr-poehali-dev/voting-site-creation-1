@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "Login user",
+      "method": "POST",
+      "body": {
+        "email": "test@example.com"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "user_id": 1,
+        "email": "test@example.com"
+      },
+      "bodyMatcher": "exact"
+    }
+  ]
+}
