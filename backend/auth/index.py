@@ -27,7 +27,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
     
     if method == 'POST':
-        body_data = json.loads(event.get('body', '{}'))
+        body = event.get('body', '{}')
+        if not body or body == '':
+            body = '{}'
+        body_data = json.loads(body)
         email = body_data.get('email', '').strip().lower()
         
         if not email:

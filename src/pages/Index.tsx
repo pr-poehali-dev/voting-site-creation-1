@@ -11,6 +11,7 @@ import PollCard from '@/components/PollCard';
 import CreatePollDialog from '@/components/CreatePollDialog';
 import PollResults from '@/components/PollResults';
 import AdminPanel from '@/components/AdminPanel';
+import UsersManagement from '@/components/UsersManagement';
 
 interface Poll {
   id: string;
@@ -215,7 +216,7 @@ export default function Index() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full h-12 ${isOwner ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full h-12 ${isOwner ? 'grid-cols-7' : 'grid-cols-5'}`}>
             <TabsTrigger value="home" className="gap-2">
               <Icon name="Home" size={16} />
               <span className="hidden sm:inline">Главная</span>
@@ -237,10 +238,16 @@ export default function Index() {
               <span className="hidden sm:inline">Профиль</span>
             </TabsTrigger>
             {isOwner && (
-              <TabsTrigger value="admin" className="gap-2">
-                <Icon name="Settings" size={16} />
-                <span className="hidden sm:inline">Админ</span>
-              </TabsTrigger>
+              <>
+                <TabsTrigger value="users" className="gap-2">
+                  <Icon name="Users" size={16} />
+                  <span className="hidden sm:inline">Пользователи</span>
+                </TabsTrigger>
+                <TabsTrigger value="admin" className="gap-2">
+                  <Icon name="Settings" size={16} />
+                  <span className="hidden sm:inline">Админ</span>
+                </TabsTrigger>
+              </>
             )}
           </TabsList>
 
@@ -369,16 +376,22 @@ export default function Index() {
           </TabsContent>
 
           {isOwner && (
-            <TabsContent value="admin" className="space-y-6">
-              <AdminPanel
-                polls={polls}
-                stats={stats}
-                onToggleStatus={handleTogglePollStatus}
-                onDelete={handleDeletePoll}
-                onExportToExcel={() => handleExportToExcel()}
-                onNavigate={setActiveTab}
-              />
-            </TabsContent>
+            <>
+              <TabsContent value="users" className="space-y-6">
+                <UsersManagement currentUserEmail={userEmail} />
+              </TabsContent>
+
+              <TabsContent value="admin" className="space-y-6">
+                <AdminPanel
+                  polls={polls}
+                  stats={stats}
+                  onToggleStatus={handleTogglePollStatus}
+                  onDelete={handleDeletePoll}
+                  onExportToExcel={() => handleExportToExcel()}
+                  onNavigate={setActiveTab}
+                />
+              </TabsContent>
+            </>
           )}
         </Tabs>
       </main>

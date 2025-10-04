@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "Получить список пользователей",
+      "method": "GET",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "users": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Обновить роль пользователя",
+      "method": "PATCH",
+      "body": {
+        "user_id": 1,
+        "role": "moderator"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "id": "number",
+        "email": "string",
+        "role": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
