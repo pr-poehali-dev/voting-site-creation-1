@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import Icon from '@/components/ui/icon';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import LoginForm from '@/components/LoginForm';
+import PollCard from '@/components/PollCard';
+import CreatePollDialog from '@/components/CreatePollDialog';
+import PollResults from '@/components/PollResults';
+import AdminPanel from '@/components/AdminPanel';
 
 interface Poll {
   id: string;
@@ -23,38 +24,30 @@ interface Poll {
 
 export default function Index() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [email, setEmail] = useState('');
   const [activeTab, setActiveTab] = useState('home');
   const [userEmail, setUserEmail] = useState('');
-  const [newPollTitle, setNewPollTitle] = useState('');
-  const [newPollDescription, setNewPollDescription] = useState('');
-  const [newPollOptions, setNewPollOptions] = useState(['', '']);
   const [userId, setUserId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState({ totalPolls: 0, totalVotes: 0, totalUsers: 0, activePolls: 0 });
+  const [polls, setPolls] = useState<Poll[]>([]);
 
   const OWNER_EMAIL = 'snovi6423@gmail.com';
   const isOwner = userEmail === OWNER_EMAIL;
 
-  const [polls, setPolls] = useState<Poll[]>([]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      try {
-        const response = await fetch('https://functions.poehali.dev/6483391f-16e3-4131-b805-2b0113ea7a06', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        const data = await response.json();
-        setUserId(data.user_id);
-        setIsAuthenticated(true);
-        setUserEmail(email);
-      } catch (error) {
-        console.error('Login error:', error);
-      }
+  const handleLogin = async (email: string) => {
+    try {
+      const response = await fetch('https://functions.poehali.dev/6483391f-16e3-4131-b805-2b0113ea7a06', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json();
+      setUserId(data.user_id);
+      setIsAuthenticated(true);
+      setUserEmail(email);
+    } catch (error) {
+      console.error('Login error:', error);
     }
   };
 
@@ -109,31 +102,26 @@ export default function Index() {
     }
   };
 
-  const handleCreatePoll = async () => {
+  const handleCreatePoll = async (title: string, description: string, options: string[]) => {
     if (!userId || !isOwner) return;
-    if (newPollTitle && newPollOptions.filter(opt => opt.trim()).length >= 2) {
-      try {
-        const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: newPollTitle,
-            description: newPollDescription,
-            options: newPollOptions.filter(opt => opt.trim()),
-            user_id: userId,
-            end_date: endDate
-          })
-        });
-        
-        setNewPollTitle('');
-        setNewPollDescription('');
-        setNewPollOptions(['', '']);
-        setIsDialogOpen(false);
-        await loadPolls();
-      } catch (error) {
-        console.error('Create poll error:', error);
-      }
+    try {
+      const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      await fetch('https://functions.poehali.dev/234eeed8-4008-4098-8315-0f88761415ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          options,
+          user_id: userId,
+          end_date: endDate
+        })
+      });
+      
+      setIsDialogOpen(false);
+      await loadPolls();
+    } catch (error) {
+      console.error('Create poll error:', error);
     }
   };
 
@@ -195,40 +183,7 @@ export default function Index() {
   };
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-lg">
-          <CardHeader className="space-y-2 text-center pb-8">
-            <div className="mx-auto w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-4">
-              <Icon name="Vote" className="text-primary-foreground" size={32} />
-            </div>
-            <CardTitle className="text-3xl font-bold">ГОЛОСОВАНИЕ.РУ</CardTitle>
-            <CardDescription className="text-base">
-              Платформа для серьёзных голосований
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              <Button type="submit" className="w-full h-11 font-semibold">
-                Войти
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <LoginForm onLogin={handleLogin} />;
   }
 
   const activePolls = polls.filter(p => p.status === 'active');
@@ -296,138 +251,25 @@ export default function Index() {
                 <p className="text-muted-foreground mt-1">Примите участие в текущих опросах</p>
               </div>
               {isOwner && (
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="gap-2">
-                      <Icon name="Plus" size={16} />
-                      Создать голосование
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Новое голосование</DialogTitle>
-                      <DialogDescription>
-                        Создайте новое голосование для участников платформы
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label>Название голосования</Label>
-                        <Input
-                          value={newPollTitle}
-                          onChange={(e) => setNewPollTitle(e.target.value)}
-                          placeholder="Введите название"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Описание</Label>
-                        <Textarea
-                          value={newPollDescription}
-                          onChange={(e) => setNewPollDescription(e.target.value)}
-                          placeholder="Опишите цель голосования"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Варианты ответов</Label>
-                        {newPollOptions.map((option, idx) => (
-                          <Input
-                            key={idx}
-                            value={option}
-                            onChange={(e) => {
-                              const updated = [...newPollOptions];
-                              updated[idx] = e.target.value;
-                              setNewPollOptions(updated);
-                            }}
-                            placeholder={`Вариант ${idx + 1}`}
-                          />
-                        ))}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setNewPollOptions([...newPollOptions, ''])}
-                          className="gap-2"
-                        >
-                          <Icon name="Plus" size={14} />
-                          Добавить вариант
-                        </Button>
-                      </div>
-                      <Button onClick={handleCreatePoll} className="w-full">
-                        Создать голосование
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <CreatePollDialog 
+                  isOpen={isDialogOpen} 
+                  onOpenChange={setIsDialogOpen} 
+                  onCreate={handleCreatePoll}
+                />
               )}
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
               {activePolls.map(poll => (
-                <Card key={poll.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-xl">{poll.title}</CardTitle>
-                        <CardDescription className="mt-2">{poll.description}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className="ml-2">Активно</Badge>
-                        {isOwner && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleTogglePollStatus(poll.id, poll.status)}
-                              title="Завершить голосование"
-                            >
-                              <Icon name="CheckCircle" size={16} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeletePoll(poll.id)}
-                              title="Удалить голосование"
-                            >
-                              <Icon name="Trash2" size={16} />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
-                      <span className="flex items-center gap-1">
-                        <Icon name="Users" size={14} />
-                        {poll.totalVotes} голосов
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Icon name="Calendar" size={14} />
-                        до {new Date(poll.endDate).toLocaleDateString('ru-RU')}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {poll.options.map(option => (
-                      <Button
-                        key={option.id}
-                        variant="outline"
-                        className="w-full justify-start h-auto py-3 px-4 hover:bg-primary hover:text-primary-foreground transition-colors"
-                        onClick={() => handleVote(poll.id, option.id)}
-                        disabled={votedPolls.has(poll.id) || poll.status === 'completed'}
-                      >
-                        <div className="w-full text-left">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{option.text}</span>
-                            <span className="text-sm">{option.votes} голосов</span>
-                          </div>
-                          <Progress 
-                            value={poll.totalVotes > 0 ? (option.votes / poll.totalVotes) * 100 : 0} 
-                            className="h-2"
-                          />
-                        </div>
-                      </Button>
-                    ))}
-                  </CardContent>
-                </Card>
+                <PollCard
+                  key={poll.id}
+                  poll={poll}
+                  isOwner={isOwner}
+                  votedPolls={votedPolls}
+                  onVote={handleVote}
+                  onToggleStatus={handleTogglePollStatus}
+                  onDelete={handleDeletePoll}
+                />
               ))}
             </div>
           </TabsContent>
@@ -435,88 +277,25 @@ export default function Index() {
           <TabsContent value="polls" className="space-y-6">
             <h2 className="text-2xl font-bold">Все голосования</h2>
             <div className="grid gap-6 md:grid-cols-2">
-              {polls.filter(p => p.status === 'active').map(poll => (
-                <Card key={poll.id}>
-                  <CardHeader>
-                    <CardTitle>{poll.title}</CardTitle>
-                    <CardDescription>{poll.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {poll.options.map(option => (
-                      <Button
-                        key={option.id}
-                        variant="outline"
-                        className="w-full justify-between"
-                        onClick={() => handleVote(poll.id, option.id)}
-                      >
-                        {option.text}
-                        <Badge variant="secondary">{option.votes}</Badge>
-                      </Button>
-                    ))}
-                  </CardContent>
-                </Card>
+              {activePolls.map(poll => (
+                <PollCard
+                  key={poll.id}
+                  poll={poll}
+                  isOwner={isOwner}
+                  votedPolls={votedPolls}
+                  onVote={handleVote}
+                  showControls={false}
+                />
               ))}
             </div>
           </TabsContent>
 
           <TabsContent value="results" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Результаты голосований</h2>
-              {isOwner && polls.length > 0 && (
-                <Button onClick={() => handleExportToExcel()} className="gap-2">
-                  <Icon name="Download" size={16} />
-                  Экспорт в Excel
-                </Button>
-              )}
-            </div>
-            <div className="grid gap-6">
-              {polls.map(poll => (
-                <Card key={poll.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <CardTitle>{poll.title}</CardTitle>
-                        <CardDescription className="mt-2">Всего голосов: {poll.totalVotes}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={poll.status === 'active' ? 'default' : 'secondary'}>
-                          {poll.status === 'active' ? 'Активно' : 'Завершено'}
-                        </Badge>
-                        {isOwner && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportToExcel(poll)}
-                            className="gap-1"
-                          >
-                            <Icon name="Download" size={14} />
-                            Excel
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {poll.options.map(option => {
-                      const percentage = poll.totalVotes > 0 
-                        ? ((option.votes / poll.totalVotes) * 100).toFixed(1) 
-                        : '0';
-                      return (
-                        <div key={option.id} className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium">{option.text}</span>
-                            <span className="text-muted-foreground">
-                              {option.votes} ({percentage}%)
-                            </span>
-                          </div>
-                          <Progress value={parseFloat(percentage)} className="h-3" />
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <PollResults 
+              polls={polls} 
+              isOwner={isOwner} 
+              onExportToExcel={handleExportToExcel}
+            />
           </TabsContent>
 
           <TabsContent value="archive" className="space-y-6">
@@ -591,188 +370,14 @@ export default function Index() {
 
           {isOwner && (
             <TabsContent value="admin" className="space-y-6">
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold">Панель администратора</h2>
-                  <p className="text-muted-foreground mt-1">Управление платформой и статистика</p>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-4">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardDescription>Всего голосований</CardDescription>
-                      <CardTitle className="text-3xl">{stats.totalPolls}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Icon name="TrendingUp" size={14} />
-                        <span>{stats.activePolls} активных</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardDescription>Всего голосов</CardDescription>
-                      <CardTitle className="text-3xl">{stats.totalVotes}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Icon name="Users" size={14} />
-                        <span>От пользователей</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardDescription>Активные голосования</CardDescription>
-                      <CardTitle className="text-3xl">{stats.activePolls}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Icon name="CheckCircle" size={14} />
-                        <span>Сейчас доступны</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardDescription>Завершённые</CardDescription>
-                      <CardTitle className="text-3xl">{stats.totalPolls - stats.activePolls}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Icon name="Archive" size={14} />
-                        <span>В архиве</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Управление голосованиями</CardTitle>
-                        <CardDescription>Все голосования с возможностью управления</CardDescription>
-                      </div>
-                      {polls.length > 0 && (
-                        <Button onClick={() => handleExportToExcel()} variant="outline" className="gap-2">
-                          <Icon name="Download" size={16} />
-                          Экспорт всех
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {polls.map(poll => (
-                        <div key={poll.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3">
-                              <h3 className="font-semibold">{poll.title}</h3>
-                              <Badge variant={poll.status === 'active' ? 'default' : 'secondary'}>
-                                {poll.status === 'active' ? 'Активно' : 'Завершено'}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">{poll.description}</p>
-                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Icon name="Users" size={12} />
-                                {poll.totalVotes} голосов
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Icon name="ListChecks" size={12} />
-                                {poll.options.length} вариантов
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Icon name="Calendar" size={12} />
-                                до {new Date(poll.endDate).toLocaleDateString('ru-RU')}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant={poll.status === 'active' ? 'outline' : 'default'}
-                              size="sm"
-                              onClick={() => handleTogglePollStatus(poll.id, poll.status)}
-                            >
-                              <Icon name={poll.status === 'active' ? 'Pause' : 'Play'} size={14} />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActiveTab('results');
-                              }}
-                            >
-                              <Icon name="BarChart3" size={14} />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeletePoll(poll.id)}
-                            >
-                              <Icon name="Trash2" size={14} />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {polls.length === 0 && (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <Icon name="Inbox" size={48} className="mx-auto mb-4 opacity-50" />
-                          <p>Пока нет голосований</p>
-                          <Button className="mt-4 gap-2" onClick={() => setActiveTab('home')}>
-                            <Icon name="Plus" size={16} />
-                            Создать первое голосование
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Быстрые действия</CardTitle>
-                    <CardDescription>Часто используемые функции</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-3">
-                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('home')}>
-                      <div className="text-left w-full">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon name="Plus" size={16} />
-                          <span className="font-semibold">Создать голосование</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Новый опрос для участников</p>
-                      </div>
-                    </Button>
-                    
-                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('results')}>
-                      <div className="text-left w-full">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon name="BarChart3" size={16} />
-                          <span className="font-semibold">Посмотреть результаты</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Статистика всех голосований</p>
-                      </div>
-                    </Button>
-                    
-                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('archive')}>
-                      <div className="text-left w-full">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon name="Archive" size={16} />
-                          <span className="font-semibold">Открыть архив</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Завершённые голосования</p>
-                      </div>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+              <AdminPanel
+                polls={polls}
+                stats={stats}
+                onToggleStatus={handleTogglePollStatus}
+                onDelete={handleDeletePoll}
+                onExportToExcel={() => handleExportToExcel()}
+                onNavigate={setActiveTab}
+              />
             </TabsContent>
           )}
         </Tabs>
