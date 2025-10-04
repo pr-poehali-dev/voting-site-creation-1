@@ -114,7 +114,7 @@ export default function Index() {
             <div className="mx-auto w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-4">
               <Icon name="Vote" className="text-primary-foreground" size={32} />
             </div>
-            <CardTitle className="text-3xl font-bold">VOTING PLATFORM</CardTitle>
+            <CardTitle className="text-3xl font-bold">ГОЛОСОВАНИЕ.ру</CardTitle>
             <CardDescription className="text-base">
               Платформа для серьёзных голосований
             </CardDescription>
